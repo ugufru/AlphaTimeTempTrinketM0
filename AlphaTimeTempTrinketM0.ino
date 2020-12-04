@@ -23,7 +23,7 @@ Adafruit_MCP9808 tempsensor = Adafruit_MCP9808();
 
 char digit[] = {' ', ' ', ' ', ' ' };
 char* message = "Jackson & Julie Together Again    ";
-char* days[] = {"SUN","MON","TUE","WED","THU","FRI","SAT"};
+char* days[] = {"SUNDAY", "MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY"};
 
 void flashDotStar(uint32_t color, int count)
 {
@@ -66,11 +66,13 @@ void error(int pos)
 void initSerial()
 {
   Serial.begin(9600);
+  delay(2000); // Wait 2 seconds to establish thes connection before printing.
 }
 
 void initAlphaDisplay()
 {
   alpha4.begin(0x70);  // pass in the address
+  Serial.println("Quad alphanumeric LED initialized.");
 }
 
 void initDotStar()
@@ -78,27 +80,21 @@ void initDotStar()
   dotstar.begin();
   dotstar.show();
   dotstar.setBrightness(DOTSTAR_BRIGHTNESS);
+  Serial.println("Trinket DotStar initialized.");
 }
 
 void initRTC()
 {
   if (rtc.begin() == false) error(80);
-
-  Serial.println("Something, something...");
-  Serial.print("rtc.initialized() = ");
-  Serial.println(rtc.initialized());
-  Serial.print("rtc.lostPower() = ");
-  Serial.println(rtc.lostPower());
+  if (rtc.initialized()) Serial.print("PCF8523 RTC initialized.");
+  if (rtc.lostPower()) Serial.print("PCF8523 RTC lost power.");
 
   if (! rtc.initialized() || rtc.lostPower())
   {
-    //   Serial.println("RTC is NOT initialized, let's set the time!");
+    Serial.println("RTC is NOT initialized, let's set the time!");
     // When time needs to be set on a new device, or after a power loss, the
     // following line sets the RTC to the date & time this sketch was compiled
-    //rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
-    // This line sets the RTC with an explicit date & time, for example to set
-    // January 21, 2014 at 3am you would call:
-    // rtc.adjust(DateTime(2014, 1, 21, 3, 0, 0));
+    rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
     //
     // Note: allow 2 seconds after inserting battery or applying external power
     // without battery before calling adjust(). This gives the PCF8523's
@@ -117,6 +113,8 @@ void initRTC()
   // to be restarted by clearing the STOP bit. Let's do this to ensure
   // the RTC is running.
   rtc.start();
+
+  Serial.println("RTC is running.");
 }
 
 void initTempSensor()
@@ -124,25 +122,18 @@ void initTempSensor()
   // Make sure the sensor is found, you can also pass in a different i2c
   // address with tempsensor.begin(0x19) for example, also can be left in blank for default address use
   // Also there is a table with all addres possible for this sensor, you can connect multiple sensors
-  // to the same i2c bus, just configure each sensor with a different address and define multiple objects for that
-  //  A2 A1 A0 address
-  //  0  0  0   0x18  this is the default address
-  //  0  0  1   0x19
-  //  0  1  0   0x1A
-  //  0  1  1   0x1B
-  //  1  0  0   0x1C
-  //  1  0  1   0x1D
-  //  1  1  0   0x1E
-  //  1  1  1   0x1F
+
   if (!tempsensor.begin(0x18))
   {
-    Serial.println("Couldn't find MCP9808! Check your connections and verify the address is correct.");
+    Serial.println("MCP9808 high-accuracy temperature sensor is NOT available.");
     while (1);
   }
 
-  Serial.println("Found MCP9808!");
+  Serial.println("MCP9808 high-accuracy temperature sensor is available.");
 
-  tempsensor.setResolution(3); // sets the resolution mode of reading, the modes are defined in the table bellow:
+  tempsensor.setResolution(0);
+
+  // sets the resolution mode of reading, the modes are defined in the table below:
   // Mode Resolution SampleTime
   //  0    0.5°C       30 ms
   //  1    0.25°C      65 ms
@@ -158,6 +149,8 @@ void setup()
   initDotStar();
   initTempSensor();
   initRTC();
+  testDisplay();
+  //displayCharacterSet();
 }
 
 void push(char c)
@@ -176,100 +169,93 @@ void push(char c)
   delay(250);
 }
 
-int level = 0;
+uint8_t previousState = -1;
 
-void loop() {
-  level = (level < 255) ? level + 1 : 0;
-  dotstar.setPixelColor(0, level, 255, level);
-  dotstar.show();
-
-  //  displayMessage(message);
-  //  displayCharacterSet();
-  displayTime();
-  delay(2000);
-  displayDate();
-  delay(2000);
-  displayTemp();
-  delay(2000);
-}
-
-//void displayTime()
-//{
-//  DateTime now = rtc.now();
-//  char format[] = "hhmm";
-//
-//  displayMessage("    TIME");
-//  displayMessage(now.toString(format));
-//}
-
-void displayTime()
+void loop()
 {
   DateTime now = rtc.now();
 
-  int hh = now.twelveHour() / 10;
-  int h = now.twelveHour() % 10;
-  int mm = now.minute() / 10;
-  int m = now.minute() % 10;
+  uint8_t state = now.second() % 20;
 
-  Serial.print("hh = ");
-  Serial.print(hh);
-  Serial.print(", h = ");
-  Serial.print(h);
-  Serial.print(", mm = ");
-  Serial.print(mm);
-  Serial.print(", m = ");
-  Serial.println(m);
+  if (state != previousState)
+  {
+    Serial.println(now.timestamp());
 
-  displayMessage("    TIME");
+    switch (state)
+    {
+      case 0:
+        displayTime(now);
+        break;
+      case 9:
+        clearDisplay();
+        break;
+      case 10:
+        displayDate(now);
+        break;
+      case 14:
+        clearDisplay();
+        break;
+      case 15:
+        displayTemperature();
+        break;
+      case 19:
+        clearDisplay();
+        break;
+    }
 
-  push((hh == 0) ? ' ' : hh + 48);
-  push(h + 48);
-  push(mm + 48);
-  push(m + 48);
+    uint32_t color = Wheel(now.second() * 4.2);
+    color = dotstar.gamma32(color);
+    dotstar.setPixelColor(0, color);
+    dotstar.show();
+
+    previousState = state;
+  }
+
+  delay(100);
 }
 
-void displayDate()
+void clearDisplay()
 {
-  DateTime now = rtc.now();
+  push(' ');
+  push(' ');
+  push(' ');
+  push(' ');
+}
+
+void displayTime(DateTime now)
+{
+  char format[] = "hhmmap";
+  now.toString(format);
+  format[4] = 0;
+
+  if (format[0] == 48) format[0] = 32;
+
+  displayMessage(format);
+}
+
+
+void displayDate(DateTime now)
+{
   char format[] = "MMDD";
-  Serial.print("now.dayOfTheWeek() = ");
-  Serial.println(now.dayOfTheWeek());
 
-  displayMessage("    DATE ");
   displayMessage(days[now.dayOfTheWeek()]);
   push(' ');
   displayMessage(now.toString(format));
 }
 
-void displayTemp()
+void displayTemperature()
 {
-  //  Serial.println("wake up MCP9808.... "); // wake up MCP9808 - power consumption ~200 mikro Ampere
-  tempsensor.wake();   // wake up, ready to read!
-
-  // Read and print out the temperature, also shows the resolution mode used for reading.
-  //  Serial.print("Resolution in mode: ");
-  //  Serial.println (tempsensor.getResolution());
-  //  float c = tempsensor.readTempC();
+  tempsensor.wake();
+  delay(40);
   float f = tempsensor.readTempF();
-  //  Serial.print("Temp: ");
-  //  Serial.print(c, 4); Serial.print("*C\t and ");
-  //  Serial.print(f, 4); Serial.println("*F.");
+  tempsensor.shutdown_wake(1);
 
   int ff = (int) f;
 
-  displayMessage("    TEMP");
-
-  push(' ');
   push(ff / 10 + 48);
   push(ff % 10 + 48);
+  push(27);
   push('F');
-
-  //  delay(1000);
-  //  Serial.println("Shutdown MCP9808.... ");
-  tempsensor.shutdown_wake(1); // shutdown MSP9808 - power consumption ~0.1 mikro Ampere, stops temperature sampling
-  //  Serial.println("");
-  //  delay(200);
-
 }
 
 void displayMessage(char* message)
@@ -282,10 +268,39 @@ void displayMessage(char* message)
   }
 }
 
+uint16_t testValues[] =
+{
+  0x1, 0x2, 0x4, 0x8, 0x10, 0x20,
+  0x200, 0x400, 0x80, 0x2000, 0x1000, 0x800, 0x40, 0x100,
+  0x1, 0x3, 0x7, 0xF, 0x1F, 0x3F,
+  0x23F, 0x63F, 0x6BF, 0x26BF, 0x36BF, 0x3EBF, 0x3EFF, 0x3FFF
+};
+
+void testDisplay()
+{
+  for (int i = 0; i < 140; i++)
+  {
+    uint16_t v = testValues[i % 28];
+    alpha4.writeDigitRaw(0, v);
+    alpha4.writeDigitRaw(1, v);
+    alpha4.writeDigitRaw(2, v);
+    alpha4.writeDigitRaw(3, v);
+    alpha4.writeDisplay();
+    delay(25);
+  }
+  alpha4.blinkRate(HT16K33_BLINK_2HZ);
+  delay(1000);
+  alpha4.blinkRate(HT16K33_BLINK_OFF);
+}
+
 void displayCharacterSet()
 {
   for (char c = 0; c < 128; c++)
   {
+    push(c / 100 + 48);
+    push(c / 10 + 48);
+    push(c % 10 + 48);
     push(c);
+    delay(1000);
   }
 }
