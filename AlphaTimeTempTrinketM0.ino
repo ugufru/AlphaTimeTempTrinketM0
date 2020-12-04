@@ -1,10 +1,9 @@
-// Demo the quad alphanumeric display LED backpack kit
-// scrolls through every character, then scrolls Serial
-// input onto the display
+
+// Dual alphanum 14-segment display
+// scrolling time, day, date, and temperature.
 
 #include <Wire.h>
 #include <Adafruit_DotStar.h>
-#include <Adafruit_GFX.h>
 #include "Adafruit_LEDBackpack.h"
 #include <TimeLib.h>
 #include "RTClib.h"
@@ -14,16 +13,18 @@
 #define DOTSTAR_CLOCK_PIN 8
 #define DOTSTAR_BRIGHTNESS 32
 
-Adafruit_AlphaNum4 alpha4 = Adafruit_AlphaNum4();
+Adafruit_AlphaNum4 alpha4Left = Adafruit_AlphaNum4();
+Adafruit_AlphaNum4 alpha4Right = Adafruit_AlphaNum4();
 Adafruit_DotStar dotstar = Adafruit_DotStar(1, DOTSTAR_DATA_PIN, DOTSTAR_CLOCK_PIN, DOTSTAR_BGR);
 
 RTC_PCF8523 rtc;
 
 Adafruit_MCP9808 tempsensor = Adafruit_MCP9808();
 
-char digit[] = {' ', ' ', ' ', ' ' };
+char digit[] = {' ', ' ', ' ', ' ', ' ', ' ', ' ', ' '};
 char* message = "Jackson & Julie Together Again    ";
 char* days[] = {"SUNDAY", "MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY"};
+int brightness[] = { 2, 2, 2, 2, 2, 2, 4, 6, 8, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 8, 6, 4 };
 
 void flashDotStar(uint32_t color, int count)
 {
@@ -71,8 +72,12 @@ void initSerial()
 
 void initAlphaDisplay()
 {
-  alpha4.begin(0x70);  // pass in the address
-  Serial.println("Quad alphanumeric LED initialized.");
+  alpha4Left.begin(0x70);
+  alpha4Left.setBrightness(15);
+  Serial.println("Left quad alphanumeric LED initialized.");
+  alpha4Right.begin(0x71);
+  alpha4Right.setBrightness(15);
+  Serial.println("Right quad alphanumeric LED initialized.");
 }
 
 void initDotStar()
@@ -158,18 +163,30 @@ void push(char c)
   digit[0] = digit[1];
   digit[1] = digit[2];
   digit[2] = digit[3];
-  digit[3] = c;
+  digit[3] = digit[4];
+  digit[4] = digit[5];
+  digit[5] = digit[6];
+  digit[6] = digit[7];
+  digit[7] = c;
 
   for (int i = 0; i < 4; i++)
   {
-    alpha4.writeDigitAscii(i, digit[i]);
+    alpha4Left.writeDigitAscii(i, digit[i]);
+    alpha4Right.writeDigitAscii(i, digit[i + 4]);
   }
 
-  alpha4.writeDisplay();
-  delay(250);
+  alpha4Left.writeDisplay();
+  alpha4Right.writeDisplay();
+  delay(130);
 }
 
 uint8_t previousState = -1;
+
+void setBrightness(int i)
+{
+  alpha4Left.setBrightness(i);
+  alpha4Right.setBrightness(i);
+}
 
 void loop()
 {
@@ -181,25 +198,27 @@ void loop()
   {
     Serial.println(now.timestamp());
 
+    setBrightness(brightness[now.hour()]);
+
     switch (state)
     {
       case 0:
         displayTime(now);
         break;
       case 9:
-        clearDisplay();
+        //clearDisplay();
         break;
       case 10:
         displayDate(now);
         break;
       case 14:
-        clearDisplay();
+        //clearDisplay();
         break;
       case 15:
         displayTemperature();
         break;
       case 19:
-        clearDisplay();
+        //clearDisplay();
         break;
     }
 
@@ -224,9 +243,8 @@ void clearDisplay()
 
 void displayTime(DateTime now)
 {
-  char format[] = "hhmmap";
+  char format[] = "hh mm AP";
   now.toString(format);
-  format[4] = 0;
 
   if (format[0] == 48) format[0] = 32;
 
@@ -236,8 +254,9 @@ void displayTime(DateTime now)
 
 void displayDate(DateTime now)
 {
-  char format[] = "MMDD";
+  char format[] = "MM/DD/YY";
 
+  push(' ');
   displayMessage(days[now.dayOfTheWeek()]);
   push(' ');
   displayMessage(now.toString(format));
@@ -252,10 +271,14 @@ void displayTemperature()
 
   int ff = (int) f;
 
+  push(' ');
+  push(' ');
   push(ff / 10 + 48);
   push(ff % 10 + 48);
   push(27);
+  push(' ');
   push('F');
+  push(' ');
 }
 
 void displayMessage(char* message)
@@ -281,16 +304,23 @@ void testDisplay()
   for (int i = 0; i < 140; i++)
   {
     uint16_t v = testValues[i % 28];
-    alpha4.writeDigitRaw(0, v);
-    alpha4.writeDigitRaw(1, v);
-    alpha4.writeDigitRaw(2, v);
-    alpha4.writeDigitRaw(3, v);
-    alpha4.writeDisplay();
+    alpha4Left.writeDigitRaw(0, v);
+    alpha4Left.writeDigitRaw(1, v);
+    alpha4Left.writeDigitRaw(2, v);
+    alpha4Left.writeDigitRaw(3, v);
+    alpha4Left.writeDisplay();
+    alpha4Right.writeDigitRaw(0, v);
+    alpha4Right.writeDigitRaw(1, v);
+    alpha4Right.writeDigitRaw(2, v);
+    alpha4Right.writeDigitRaw(3, v);
+    alpha4Right.writeDisplay();
     delay(25);
   }
-  alpha4.blinkRate(HT16K33_BLINK_2HZ);
+  alpha4Left.blinkRate(HT16K33_BLINK_2HZ);
+  alpha4Right.blinkRate(HT16K33_BLINK_2HZ);
   delay(1000);
-  alpha4.blinkRate(HT16K33_BLINK_OFF);
+  alpha4Left.blinkRate(HT16K33_BLINK_OFF);
+  alpha4Right.blinkRate(HT16K33_BLINK_OFF);
 }
 
 void displayCharacterSet()
