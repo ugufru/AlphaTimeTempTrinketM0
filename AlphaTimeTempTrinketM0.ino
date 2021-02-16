@@ -136,7 +136,7 @@ void initTempSensor()
 
   Serial.println("MCP9808 high-accuracy temperature sensor is available.");
 
-  tempsensor.setResolution(0);
+  tempsensor.setResolution(3);
 
   // sets the resolution mode of reading, the modes are defined in the table below:
   // Mode Resolution SampleTime
