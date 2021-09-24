@@ -22,9 +22,10 @@ RTC_PCF8523 rtc;
 Adafruit_MCP9808 tempsensor = Adafruit_MCP9808();
 
 char digit[] = {' ', ' ', ' ', ' ', ' ', ' ', ' ', ' '};
-char* message = "Jackson & Julie Together Again    ";
-char* days[] = {"SUNDAY", "MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY"};
-int brightness[] = { 2, 2, 2, 2, 2, 2, 4, 6, 8, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 8, 6, 4 };
+
+const char* message = "Jackson & Julie Together Again    ";
+const char* days[] = {"SUNDAY", "MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY"};
+const int brightness[] = { 2, 2, 2, 2, 2, 2, 4, 6, 8, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 8, 6, 4 };
 
 void flashDotStar(uint32_t color, int count)
 {
@@ -281,7 +282,7 @@ void displayTemperature()
   push(' ');
 }
 
-void displayMessage(char* message)
+void displayMessage(const char* message)
 {
   int i = 0;
   while (message[i] != 0)
